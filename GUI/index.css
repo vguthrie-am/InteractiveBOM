@@ -2,6 +2,7 @@
   --pcb-edge-color: black;
   --pad-color: #878787;
   --pad-color-highlight: #D04040;
+  --pad-color-highlight-selected: #40D040;
   --pin1-outline-color: #ffb629;
   --pin1-outline-color-highlight: #b4ff03;
 }
@@ -331,6 +332,18 @@ canvas:active {
 
 .filter {
   width: calc(100% - 10px);
+}
+
+.btn-clear {
+  float: left;
+  height: 20px;
+  width: 20px;
+  margin: 20px -35px;
+  padding: 1px 1px;
+  text-align: middle;
+  font-family: Consolas, "DejaVu Sans Mono", Monaco, monospace;
+  box-sizing: border-box;
+  border-radius: 100%;
 }
 
 input[type=text]:focus {

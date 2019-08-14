@@ -33,57 +33,22 @@ function setDarkMode(value) {
   render.redrawCanvas(allcanvas.back);
 }
 
-function getStoredCheckboxRefs(checkbox) {
-  var existingRefs = globalData.readStorage("checkbox_" + checkbox);
-  if (!existingRefs) {
-    return new Set();
-  } else {
-    return new Set(existingRefs.split(","));
-  }
-}
 
-function getCheckboxState(checkbox, references) {
-  var storedRefsSet = getStoredCheckboxRefs(checkbox);
-  var currentRefsSet = new Set(references);
-  // Get difference of current - stored
-  var difference = new Set(currentRefsSet);
-  for (ref of storedRefsSet) {
-    difference.delete(ref);
-  }
-  if (difference.size == 0) {
-    // All the current refs are stored
-    return "checked";
-  } else if (difference.size == currentRefsSet.size) {
-    // None of the current refs are stored
-    return "unchecked";
-  } else {
-    // Some of the refs are stored
-    return "indeterminate";
-  }
-}
-
-function setBomCheckboxState(checkbox, element, references) {
-  var state = getCheckboxState(checkbox, references);
-  element.checked = (state == "checked");
-  element.indeterminate = (state == "indeterminate");
-}
-
-function createCheckboxChangeHandler(checkbox, references) {
-  return function() {
-    refsSet = getStoredCheckboxRefs(checkbox);
-    if (this.checked) {
-      // checkbox ticked
-      for (var ref of references) {
-        refsSet.add(ref);
-      }
-    } else {
-      // checkbox unticked
-      for (var ref of references) {
-        refsSet.delete(ref);
-      }
+function createCheckboxChangeHandler(checkbox, bomentry) {
+    return function() 
+    {
+        if(bomentry.checkboxes.get(checkbox))
+        {
+            bomentry.checkboxes.set(checkbox,false);
+            globalData.writeStorage("checkbox" + "_" + checkbox.toLowerCase() + "_" + bomentry.reference, "false");
+        }
+        else
+        {
+            bomentry.checkboxes.set(checkbox,true);
+             globalData.writeStorage("checkbox" + "_" + checkbox.toLowerCase() + "_" + bomentry.reference, "true");
+        }
+       
     }
-    globalData.writeStorage("checkbox_" + checkbox, [...refsSet].join(","));
-  }
 }
 
 function createRowHighlightHandler(rowid, refs) {
@@ -97,7 +62,8 @@ function createRowHighlightHandler(rowid, refs) {
     document.getElementById(rowid).classList.add("highlighted");
     globalData.setCurrentHighlightedRowId(rowid);
     globalData.setHighlightedRefs(refs);
-    render.drawHighlights();
+    // If highlighted then a special color will be used for the part.
+    render.drawHighlights(IsCheckboxClicked(globalData.getCurrentHighlightedRowId(), "placed"));
   }
 }
 
@@ -155,35 +121,6 @@ function highlightFilter(s) {
   return r;
 }
 
-function checkboxSetUnsetAllHandler(checkboxname) {
-  return function() {
-    var checkboxnum = 0;
-    while (checkboxnum < globalData.getCheckboxes().length &&
-      globalData.getCheckboxes()[checkboxnum].toLowerCase() != checkboxname.toLowerCase()) {
-      checkboxnum++;
-    }
-    if (checkboxnum >= globalData.getCheckboxes().length) {
-      return;
-    }
-    var allset = true;
-    var checkbox;
-    var row;
-    for (row of bombody.childNodes) {
-      checkbox = row.childNodes[checkboxnum + 1].childNodes[0];
-      if (!checkbox.checked || checkbox.indeterminate) {
-        allset = false;
-        break;
-      }
-    }
-    for (row of bombody.childNodes) {
-      checkbox = row.childNodes[checkboxnum + 1].childNodes[0];
-      checkbox.checked = !allset;
-      checkbox.indeterminate = false;
-      checkbox.onchange();
-    }
-  }
-}
-
 function createColumnHeader(name, cls, comparator) {
   var th = document.createElement("TH");
   th.innerHTML = name;
@@ -194,24 +131,31 @@ function createColumnHeader(name, cls, comparator) {
   span.classList.add("none");
   th.appendChild(span);
   th.onclick = function() {
-    if (globalData.getCurrentSortColumn() && this !== globalData.getCurrentSortColumn()) {
+    if (globalData.getCurrentSortColumn() && this !== globalData.getCurrentSortColumn()) 
+    {
       // Currently sorted by another column
       globalData.getCurrentSortColumn().childNodes[1].classList.remove(globalData.getCurrentSortOrder());
       globalData.getCurrentSortColumn().childNodes[1].classList.add("none");
       globalData.setCurrentSortColumn(null);
       globalData.setCurrentSortOrder(null);
     }
-    if (globalData.getCurrentSortColumn() && this === globalData.getCurrentSortColumn()) {
+
+    if (globalData.getCurrentSortColumn() && this === globalData.getCurrentSortColumn()) 
+    {
       // Already sorted by this column
-      if (globalData.getCurrentSortOrder() == "asc") {
+      if (globalData.getCurrentSortOrder() == "asc") 
+      {
         // Sort by this column, descending order
-        globalData.setBomSortFunction(function(a, b) {
+        globalData.setBomSortFunction(function(a, b) 
+        {
           return -comparator(a, b);
         });
         globalData.getCurrentSortColumn().childNodes[1].classList.remove("asc");
         globalData.getCurrentSortColumn().childNodes[1].classList.add("desc");
         globalData.setCurrentSortOrder("desc");
-      } else {
+      } 
+      else 
+      {
         // Unsort
         globalData.setBomSortFunction(null);
         globalData.getCurrentSortColumn().childNodes[1].classList.remove("desc");
@@ -219,7 +163,9 @@ function createColumnHeader(name, cls, comparator) {
         globalData.setCurrentSortColumn(null);
         globalData.setCurrentSortOrder(null);
       }
-    } else {
+    } 
+    else 
+    {
       // Sort by this column, ascending order
       globalData.setBomSortFunction(comparator);
       globalData.setCurrentSortColumn(this);
@@ -232,51 +178,60 @@ function createColumnHeader(name, cls, comparator) {
   return th;
 }
 
-function fancyDblClickHandler(el, onsingle, ondouble) {
-  return function() {
-    if (el.getAttribute("data-dblclick") == null) {
-      el.setAttribute("data-dblclick", 1);
-      setTimeout(function() {
-        if (el.getAttribute("data-dblclick") == 1) {
-          onsingle();
+// Describes how to sort checkboxes
+function CheckboxCompare(stringName)
+{
+  return (partA, partB) => {
+          if (partA.checkboxes.get(stringName) && !partB.checkboxes.get(stringName)) 
+          {
+              return  1;
+          }
+          else if (!partA.checkboxes.get(stringName) && partB.checkboxes.get(stringName)) 
+          {
+            return -1;
+          } 
+          else
+          {
+              return 0;
+          }
         }
-        el.removeAttribute("data-dblclick");
-      }, 200);
-    } else {
-      el.removeAttribute("data-dblclick");
-      ondouble();
-    }
-  }
 }
 
-function populateBomHeader() {
-  while (bomhead.firstChild) {
+// Describes hoe to sort by attributes
+function AttributeCompare(stringName)
+{
+  return (partA, partB) => {
+          if (partA.attributes.get(stringName) != partB.attributes.get(stringName)) return  partA.attributes.get(stringName) > partB.attributes.get(stringName) ? 1 : -1;
+          else return 0;
+        }
+}
+
+
+
+function populateBomHeader() 
+{
+  while (bomhead.firstChild) 
+  {
     bomhead.removeChild(bomhead.firstChild);
   }
+  
   var tr = document.createElement("TR");
   var th = document.createElement("TH");
   th.classList.add("numCol");
   tr.appendChild(th);
-  globalData.setCheckboxes(globalData.getBomCheckboxes().split(",").filter((e) => e));
-  //XXX: There is something weird with this. The behavior is to sort the buttons but 
-  // in the gui it actis funny
-  var checkboxCompareClosure = function(checkbox) {
-    return (a, b) => {
-      var stateA = getCheckboxState(checkbox, a[3]);
-      var stateB = getCheckboxState(checkbox, b[3]);
-      if (stateA > stateB) return -1;
-      if (stateA < stateB) return 1;
-      return 0;
-    }
-  }
 
-  for (var checkbox of globalData.getCheckboxes()) {
-    th = createColumnHeader(
-      checkbox, checkbox, checkboxCompareClosure(checkbox));
-    th.onclick = fancyDblClickHandler(
-      th, th.onclick.bind(th), checkboxSetUnsetAllHandler(checkbox));
-    tr.appendChild(th);
-  }
+
+  var additionalCheckboxes = globalData.getBomCheckboxes().split(",");
+  additionalCheckboxes     = additionalCheckboxes.filter(function(e){return e});
+  globalData.setCheckboxes(additionalCheckboxes);
+  for (var x2 of additionalCheckboxes) {
+      // remove beginning and trailing whitespace
+      x2 = x2.trim()
+      if (x2) 
+      {
+        tr.appendChild(createColumnHeader(x2, "Checkboxes", CheckboxCompare(x2)));
+      }
+    }
 
   tr.appendChild(createColumnHeader("References", "References", (partA, partB) => {
       if (partA.reference != partB.reference) return partA.reference > partB.reference ? 1 : -1;
@@ -299,11 +254,9 @@ function populateBomHeader() {
   for (var x of additionalAttributes) {
       // remove beginning and trailing whitespace
       x = x.trim()
-      if (x) {
-        tr.appendChild(createColumnHeader(x, "Attributes", (partA, partB) => {
-          if (partA.attributes.get(x) != partB.attributes.get(x)) return  partA.attributes.get(x) > partB.attributes.get(x) ? 1 : -1;
-          else return 0;
-        }));
+      if (x) 
+      {
+        tr.appendChild(createColumnHeader(x, "Attributes", AttributeCompare(x)));
       }
     }
 
@@ -417,10 +370,24 @@ function populateBomBody() {
     var bomentry = bomtable[i];
     var references = bomentry.reference;
 
-    if (getFilter() != ""){
-      if(!entryMatches(bomentry)){
-        continue;
-      }
+    // remove entries that do not match filter
+    if (getFilter() != "")
+    {
+        if(!entryMatches(bomentry))
+        {
+          continue;
+        }
+    }
+    
+    
+    // Hide placed parts option is set
+    if(globalData.getHidePlacedParts())
+    {
+        // Remove entries that have been placed. Check the placed parameter
+        if(globalData.readStorage( "checkbox" + "_" + "placed" + "_" + bomentry.reference ) == "true")
+        {
+           continue;
+        }
     }
 
 
@@ -432,17 +399,42 @@ function populateBomBody() {
     tr.appendChild(td);
 
     // Checkboxes
-    for (var checkbox of globalData.getCheckboxes()) {
-      if (checkbox) {
+    var additionalCheckboxes = globalData.getBomCheckboxes().split(",");
+    for (var checkbox of additionalCheckboxes) 
+    {
+      checkbox = checkbox.trim();
+      if (checkbox) 
+      {
         td = document.createElement("TD");
         var input = document.createElement("input");
         input.type = "checkbox";
-        input.onchange = createCheckboxChangeHandler(checkbox, references);
-        setBomCheckboxState(checkbox, input, references);
+        input.onchange = createCheckboxChangeHandler(checkbox, bomentry);
+        // read the value in from local storage
+
+        if(globalData.readStorage( "checkbox" + "_" + checkbox.toLowerCase() + "_" + bomentry.reference ) == "true")
+        {
+             bomentry.checkboxes.set(checkbox,true)
+        }
+        else
+        {
+          bomentry.checkboxes.set(checkbox,false)
+        }
+        console.log(typeof(bomentry.checkboxes.get(checkbox)))
+        if(bomentry.checkboxes.get(checkbox))
+        {
+          input.checked = true;
+        }
+        else
+        {
+          input.checked = false;
+        }
+
         td.appendChild(input);
         tr.appendChild(td);
       }
     }
+
+
 
     //INFO: The lines below add the control the columns on the bom table
     // References
@@ -709,22 +701,22 @@ function toggleBomCheckbox(bomrowid, checkboxnum) {
   checkbox.onchange();
 }
 
-function checkBomCheckbox(bomrowid, checkboxname) {
-  var checkboxnum = 0;
-  while (checkboxnum < globalData.getCheckboxes().length &&
-    globalData.getCheckboxes()[checkboxnum].toLowerCase() != checkboxname.toLowerCase()) {
-    checkboxnum++;
-  }
-  if (!bomrowid || checkboxnum >= globalData.getCheckboxes().length) {
-    return;
-  }
-  var bomrow = document.getElementById(bomrowid);
-  var checkbox = bomrow.childNodes[checkboxnum + 1].childNodes[0];
-  checkbox.checked = true;
-  checkbox.indeterminate = false;
-  checkbox.onchange();
-}
+function IsCheckboxClicked(bomrowid, checkboxname) 
+{
+    var checkboxnum = 0;
+    while (checkboxnum < globalData.getCheckboxes().length && globalData.getCheckboxes()[checkboxnum].toLowerCase() != checkboxname.toLowerCase()) 
+    {
+      checkboxnum++;
+    }
+    if (!bomrowid || checkboxnum >= globalData.getCheckboxes().length) 
+    {
+      return;
+    }
+    var bomrow = document.getElementById(bomrowid);
+    var checkbox = bomrow.childNodes[checkboxnum + 1].childNodes[0];
+    return checkbox.checked;
 
+}
 
 function removeGutterNode(node) {
   for (var i = 0; i < node.childNodes.length; i++) {
@@ -767,7 +759,8 @@ document.onkeydown = function(e) {
         return;
       }
       if (globalData.getCurrentHighlightedRowId() !== null) {
-        checkBomCheckbox(globalData.getCurrentHighlightedRowId(), "placed");
+        // XXX: Why was the following line in the software
+        //checkBomCheckbox(globalData.getCurrentHighlightedRowId(), "placed");
         highlightNextRow();
         e.preventDefault();
       }
@@ -817,7 +810,8 @@ document.onkeydown = function(e) {
         break;
     }
     if (e.key >= '1' && e.key <= '9') {
-      toggleBomCheckbox(currentHighlightedRowId, parseInt(e.key));
+      // TODO: This might be able to be removed
+      //toggleBomCheckbox(currentHighlightedRowId, parseInt(e.key));
     }
   }
 }
@@ -870,6 +864,10 @@ window.onload = function(e) {
   if (globalData.readStorage("darkmode") === "true") {
     document.getElementById("darkmodeCheckbox").checked = true;
     setDarkMode(true);
+  }
+  if (globalData.readStorage("hidePlacedParts") === "true") {
+    document.getElementById("hidePlacedParts").checked = true;
+     globalData.setHidePlacedParts(true);
   }
   if (globalData.readStorage("highlightpin1") === "true") {
     document.getElementById("highlightpin1Checkbox").checked = true;

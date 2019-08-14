@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Interactive BOM for KiCAD</title>
+  <title>Interactive BOM for Autodesk Eagle</title>
   <link href="index.css" rel="stylesheet">
 
   <!-- This is a really hacky way to import the json data from
@@ -39,6 +39,10 @@
           <label class="menu-label">
             <input id="combineValues" type="checkbox">
             Combine values
+          </label>
+           <label class="menu-label">
+            <input id="hidePlacedParts" type="checkbox">
+            Hide placed parts
           </label>
           <label class="menu-label">
             <span>Board rotation</span>
@@ -81,7 +85,7 @@
           </tr>
           <tr>
             <td id="company">
-              Kicad version
+              Eagle version
             </td>
             <td id="filedate">
               Date
@@ -95,6 +99,7 @@
     <div id="bomdiv" class="split split-horizontal">
       <div style="width: 100%">
         <input id="filter" class="searchbox filter hideonprint" type="text" placeholder="Filter">
+        <button id="clearSearch" class="btn-clear" type="button" title="Clear Filter" >X</button>
       </div>
       <div id="dbg"></div>
       <table class="bom">
