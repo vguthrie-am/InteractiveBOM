@@ -64,10 +64,17 @@ for e in pcbdata['bom']['both']:
         partno = attr_val[partno_ind]
         db_part = find_part(db, partno)
         customer_ref = db_part['Customer Ref']
+        pkg_code = db_part['Pkg Code']
     except ValueError:
         customer_ref = ''
+        pkg_code = ''
+    
     e[4] += ';Customer Ref'
     e[5] += ';%s' % (customer_ref)
+    e[4] += ';Pkg Code'
+    e[5] += ';%s' % (pkg_code)
+
+        
 
 
 save_json(json_file, json_preamble, pcbdata)
